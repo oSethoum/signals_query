@@ -1,0 +1,23 @@
+name: signals_query
+description: "A robust, reactive asynchronous state management and data-fetching library for Flutter leveraging the minimal, hooks-free power of Signals."
+version: 1.0.0
+homepage: "https://github.com/signals_query"
+repository: "https://github.com/signals_query"
+issue_tracker: "https://github.com/signals_query/issues"
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  signals: ^6.3.0
+  signals_flutter: ^6.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
