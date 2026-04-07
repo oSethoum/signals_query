@@ -4,12 +4,16 @@ import 'options.dart';
 import 'state.dart';
 import 'infinite_query.dart';
 
+/// Global default [QueryClient] used by the factory functions when no client is
+/// provided.
 final queryClient = QueryClient();
 
+/// Computes a stable hash string for a [QueryOptions.queryKey].
 String hashQueryKey(List<dynamic> key) {
   return key.map((e) => e.toString()).join('\$\$\$');
 }
 
+/// Returns true when [partialKey] matches the start of [targetKey].
 bool matchQueryKey(List<dynamic> targetKey, List<dynamic> partialKey) {
   if (partialKey.length > targetKey.length) return false;
   for (int i = 0; i < partialKey.length; i++) {
@@ -18,14 +22,21 @@ bool matchQueryKey(List<dynamic> targetKey, List<dynamic> partialKey) {
   return true;
 }
 
+/// Central cache and lifecycle manager for queries and infinite queries.
+///
+/// - Caches queries by their key hash.
+/// - Provides invalidation helpers.
+/// - Optionally refetches stale queries when the app resumes.
 class QueryClient extends WidgetsBindingObserver {
   final Map<String, Query> _queries = {};
   final Map<String, InfiniteQuery> _infiniteQueries = {};
 
+  /// Creates a client and registers a lifecycle observer.
   QueryClient() {
     WidgetsBinding.instance.addObserver(this);
   }
 
+  /// Disposes cached queries and unregisters the lifecycle observer.
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     // Disposing queries can synchronously remove themselves from the cache via
@@ -60,6 +71,7 @@ class QueryClient extends WidgetsBindingObserver {
     }
   }
 
+  /// Returns a cached [Query] for [QueryOptions.queryKey], creating it if needed.
   Query<TData, dynamic> createQuery<TData>(QueryOptions<TData> options) {
     final hash = hashQueryKey(options.queryKey);
     var query = _queries[hash] as Query<TData, dynamic>?;
@@ -79,6 +91,7 @@ class QueryClient extends WidgetsBindingObserver {
     return query;
   }
 
+  /// Returns a cached [InfiniteQuery] for [InfiniteQueryOptions.queryKey], creating it if needed.
   InfiniteQuery<TData, dynamic, TPageParam> createInfiniteQuery<
     TData,
     TPageParam
@@ -102,6 +115,9 @@ class QueryClient extends WidgetsBindingObserver {
     return query;
   }
 
+  /// Refetches all cached queries that match [queryKey].
+  ///
+  /// When [exact] is false (default), [queryKey] is treated as a prefix.
   void invalidateQueries(List<dynamic> queryKey, {bool exact = false}) {
     for (final query in _queries.values) {
       if (exact) {
@@ -127,6 +143,7 @@ class QueryClient extends WidgetsBindingObserver {
     }
   }
 
+  /// Refetches all cached queries for which [match] returns true.
   void invalidateQueryMatch(bool Function(List<dynamic> key) match) {
     for (final query in _queries.values) {
       if (match(query.queryKey)) {
@@ -140,6 +157,7 @@ class QueryClient extends WidgetsBindingObserver {
     }
   }
 
+  /// Overwrites the cached data for an existing query.
   void setQueryData<TData>(List<dynamic> queryKey, TData data) {
     final hash = hashQueryKey(queryKey);
     final query = _queries[hash] as Query<TData, dynamic>?;
@@ -152,6 +170,7 @@ class QueryClient extends WidgetsBindingObserver {
     }
   }
 
+  /// Returns cached data for [queryKey], or `null` if missing.
   TData? getQueryData<TData>(List<dynamic> queryKey) {
     final hash = hashQueryKey(queryKey);
     final query = _queries[hash] as Query<TData, dynamic>?;
@@ -159,6 +178,11 @@ class QueryClient extends WidgetsBindingObserver {
   }
 }
 
+/// Provides a [QueryClient] to a widget subtree.
+///
+/// Note: the current factory helpers default to the global [queryClient]. Use
+/// this widget when you want to pass a custom [QueryClient] through the widget
+/// tree for your own integration code.
 class QueryClientProvider extends InheritedWidget {
   final QueryClient client;
 
@@ -168,6 +192,7 @@ class QueryClientProvider extends InheritedWidget {
     required super.child,
   });
 
+  /// Returns the nearest [QueryClientProvider] in the widget tree.
   static QueryClient of(BuildContext context) {
     final provider = context
         .dependOnInheritedWidgetOfExactType<QueryClientProvider>();
