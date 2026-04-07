@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:signals_flutter/signals_flutter.dart';
 import 'state.dart';
+import 'client.dart';
 
 typedef InfiniteQueryFn<TData, TPageParam> =
     Future<TData> Function(TPageParam? pageParam);
@@ -104,6 +105,16 @@ class InfiniteQuery<TData, TError, TPageParam> {
   InfiniteQueryOptions<TData, TPageParam> options;
 
   final Signal<InfiniteQueryState<TData, TError, TPageParam>> state;
+
+  List<TData>? get pages => state.value.pages;
+  List<TPageParam?>? get pageParams => state.value.pageParams;
+  TError? get error => state.value.error;
+  bool get isLoading => state.value.isLoading;
+  bool get isError => state.value.isError;
+  bool get isSuccess => state.value.isSuccess;
+  bool get isFetching => state.value.isFetching;
+  bool get isFetchingNextPage => state.value.isFetchingNextPage;
+  bool get hasNextPage => state.value.hasNextPage;
 
   Timer? _gcTimer;
   int _observersCount = 0;
@@ -260,4 +271,21 @@ class InfiniteQuery<TData, TError, TPageParam> {
   }
 
   void Function()? onDispose;
+}
+
+InfiniteQuery<TData, dynamic, TPageParam> Function(TVariables) createInfiniteQuery<TData, TVariables, TPageParam>(
+  InfiniteQueryOptions<TData, TPageParam> Function(TVariables) optionsBuilder, {
+  QueryClient? client,
+}) {
+  return (TVariables variables) {
+    final activeClient = client ?? queryClient;
+    final options = optionsBuilder(variables);
+    final query = activeClient.createInfiniteQuery<TData, TPageParam>(options);
+
+    if (options.enabled && query.isStale) {
+      Future.microtask(() => query.fetch());
+    }
+
+    return query;
+  };
 }

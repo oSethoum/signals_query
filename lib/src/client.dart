@@ -4,6 +4,8 @@ import 'options.dart';
 import 'state.dart';
 import 'infinite_query.dart';
 
+final queryClient = QueryClient();
+
 String hashQueryKey(List<dynamic> key) {
   return key.map((e) => e.toString()).join('\$\$\$');
 }
@@ -26,11 +28,13 @@ class QueryClient extends WidgetsBindingObserver {
 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final query in _queries.values) {
+    // Disposing queries can synchronously remove themselves from the cache via
+    // `onDispose`, so iterate over a snapshot to avoid concurrent modification.
+    for (final query in _queries.values.toList()) {
       query.dispose();
     }
     _queries.clear();
-    for (final query in _infiniteQueries.values) {
+    for (final query in _infiniteQueries.values.toList()) {
       query.dispose();
     }
     _infiniteQueries.clear();

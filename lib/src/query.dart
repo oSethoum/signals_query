@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:signals_flutter/signals_flutter.dart';
 import 'state.dart';
 import 'options.dart';
+import 'client.dart';
 
 class Query<TData, TError> {
   final List<dynamic> queryKey;
@@ -120,4 +121,21 @@ class Query<TData, TError> {
   bool get isError => state.value.isError;
   bool get isSuccess => state.value.isSuccess;
   bool get isFetching => state.value.isFetching;
+}
+
+Query<TData, dynamic> Function(TVariables) createQuery<TData, TVariables>(
+  QueryOptions<TData> Function(TVariables) optionsBuilder, {
+  QueryClient? client,
+}) {
+  return (TVariables variables) {
+    final activeClient = client ?? queryClient;
+    final options = optionsBuilder(variables);
+    final query = activeClient.createQuery<TData>(options);
+
+    if (options.enabled && query.isStale) {
+      Future.microtask(() => query.fetch());
+    }
+
+    return query;
+  };
 }

@@ -4,4 +4,3 @@ export 'src/query.dart';
 export 'src/infinite_query.dart';
 export 'src/mutation.dart';
 export 'src/client.dart';
-export 'src/widgets.dart';
