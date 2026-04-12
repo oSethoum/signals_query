@@ -1,3 +1,8 @@
+## 1.2.0
+
+* Documentation: Added `infinite_scroll_pagination` usage with `createInfiniteQuery` back into README.md.
+* Feature: Re-added `createInfiniteQuery` functional API for endless scrolling.
+
 ## 1.0.0
 
 * Initial release of signals_query.
