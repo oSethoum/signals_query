@@ -60,6 +60,10 @@ class MemoryCache implements Cache {
   CacheEntry<T>? get<T>(String key) {
     final entry = _store[key];
     if (entry == null) return null;
+    if (entry.isStale) {
+      _store.remove(key);
+      return null;
+    }
     return entry as CacheEntry<T>;
   }
 
@@ -192,7 +196,7 @@ class QueryClient {
   final Duration defaultStaleTime;
 
   final Map<String, Signal<int>> _invalidations = {};
-  final Map<String, dynamic> _active = {};
+  final Map<String, Set<dynamic>> _active = {};
 
   /// Creates a query client.
   QueryClient({
@@ -218,13 +222,21 @@ class QueryClient {
 
   /// Internal method to register an active query.
   /// @nodoc
-  void register(String key, dynamic q) => _active[key] = q;
+  void register(String key, dynamic q) {
+    _active.putIfAbsent(key, () => {}).add(q);
+  }
 
   /// Internal method to unregister a query when disposed.
   /// @nodoc
-  void unregister(String key) {
-    _active.remove(key);
-    _invalidations.remove(key)?.dispose();
+  void unregister(String key, dynamic q) {
+    final activeSet = _active[key];
+    if (activeSet != null) {
+      activeSet.remove(q);
+      if (activeSet.isEmpty) {
+        _active.remove(key);
+        _invalidations.remove(key)?.dispose();
+      }
+    }
   }
 }
 
@@ -265,9 +277,14 @@ class Query<T> {
     this.retryDelay = const Duration(milliseconds: 500),
   }) {
     final key = serializeKey(keyFn());
+    final cached = client.cache.get<T>(key);
 
-    _state = signal(QueryState<T>());
-    _previous = signal<T?>(null);
+    _state = signal(QueryState<T>(
+      data: cached?.data,
+      status: cached != null ? QueryStatus.success : QueryStatus.idle,
+      updatedAt: cached?.updatedAt,
+    ));
+    _previous = signal<T?>(cached?.data);
 
     final invalidation = client.invalidationSignalFor(key);
 
@@ -358,7 +375,7 @@ class Query<T> {
     _effect();
     _state.dispose();
     _previous.dispose();
-    client.unregister(serializeKey(keyFn()));
+    client.unregister(serializeKey(keyFn()), this);
   }
 }
 
@@ -384,6 +401,13 @@ class Mutation<T, P> {
 
   /// Exposes the error if a mutation fails.
   ReadonlySignal<Object?> get error => _error;
+
+  /// Disposes internal tracking signals manually.
+  void dispose() {
+    _loading.dispose();
+    _data.dispose();
+    _error.dispose();
+  }
 
   /// Executes the mutation with the given [params].
   Future<T?> mutate(P params) async {
@@ -533,7 +557,9 @@ class InfiniteQuery<TData, TPageParam> {
     required this.getNextPageParam,
   }) {
     final key = serializeKey(keyFn());
-    _state = signal(InfiniteQueryState<TData, TPageParam>());
+    final cached = client.cache.get<InfiniteQueryState<TData, TPageParam>>(key);
+    
+    _state = signal(cached?.data ?? InfiniteQueryState<TData, TPageParam>());
     final invalidation = client.invalidationSignalFor(key);
 
     Future<void> runFetch() async {
@@ -559,6 +585,11 @@ class InfiniteQuery<TData, TPageParam> {
           isFetching: false,
           isFetchingNextPage: false,
           hasNextPage: nextParam != null,
+        );
+        client.cache.set<InfiniteQueryState<TData, TPageParam>>(
+          key, 
+          _state.value, 
+          ttl: client.defaultTtl
         );
       } catch (e) {
         if (_disposed) return;
@@ -618,6 +649,11 @@ class InfiniteQuery<TData, TPageParam> {
         isFetchingNextPage: false,
         hasNextPage: newNextParam != null,
       );
+      client.cache.set<InfiniteQueryState<TData, TPageParam>>(
+        serializeKey(keyFn()), 
+        _state.value, 
+        ttl: client.defaultTtl
+      );
     } catch (e) {
       if (_disposed) return;
       _state.value = _state.value.copyWith(
@@ -638,7 +674,7 @@ class InfiniteQuery<TData, TPageParam> {
     _disposed = true;
     _effect();
     _state.dispose();
-    client.unregister(serializeKey(keyFn()));
+    client.unregister(serializeKey(keyFn()), this);
   }
 }
 
