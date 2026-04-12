@@ -1,3 +1,10 @@
+## 1.2.1
+
+* Fix: Resolved major signal GC memory leaks within sibling query invalidations.
+* Fix: Query & InfiniteQuery now natively serialize their states back from cached history upon boot.
+* Feature: Extended MemoryCache logic to self-destruct stale elements upon getter access dynamically.
+* Feature: Added `.dispose()` method securely to Mutations.
+
 ## 1.2.0
 
 * Documentation: Added `infinite_scroll_pagination` usage with `createInfiniteQuery` back into README.md.
